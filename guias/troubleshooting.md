@@ -127,7 +127,7 @@ SELECT @@global.time_zone, @@session.time_zone, NOW(), UTC_TIMESTAMP();
 -- Ver últimas ejecuciones del Job
 SELECT * FROM job_executions
 WHERE job_nombre = 'VENCIMIENTO_OPUN'
-ORDER BY fecha_ejecucion DESC
+ORDER BY fecha_inicio DESC
 LIMIT 10;
 ```
 
