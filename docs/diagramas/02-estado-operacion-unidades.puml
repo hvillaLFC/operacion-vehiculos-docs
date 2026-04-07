@@ -1,0 +1,48 @@
+@startuml estado-operacion-unidades
+title Estado de OPERACION_UNIDADES - Máquina de Estados
+
+[*] --> EN_PROCESO
+
+EN_PROCESO --> CONFIRMADA : Confirmar operación < 15 min\n(INVENTARIO → APARTADO)
+EN_PROCESO --> VENCIDA : > 15 min sin confirmación (Job)\n(INVENTARIO → DISPONIBLE)
+
+CONFIRMADA --> EN_RENTA : Checkin completado\n(INVENTARIO → RENTADO)
+CONFIRMADA --> CANCELADA : Cancelar operación\n(INVENTARIO → DISPONIBLE)
+CONFIRMADA --> RESERVADA : Unidad en otra operación activa\n(INVENTARIO sin cambio)
+
+EN_RENTA --> FINALIZADA : Checkout realizado\n(INVENTARIO → DISPONIBLE)
+EN_RENTA --> CANCELADA : Cancelación forzada\n(INVENTARIO → DISPONIBLE)
+
+RESERVADA --> CONFIRMADA : Reactivar\n(validar INVENTARIO = DISPONIBLE)\n(INVENTARIO → APARTADO)
+RESERVADA --> CANCELADA : Cancelar intención
+
+VENCIDA --> EN_PROCESO : Re-agregar unidad\n(INVENTARIO = DISPONIBLE,\npermite nuevo intento)
+
+CANCELADA --> [*]
+FINALIZADA --> [*]
+
+note right of EN_PROCESO
+  Estado inicial al agregar unidad.
+  Timer: 15 minutos.
+  Si vence → VENCIDA (Job automático).
+end note
+
+note right of RESERVADA
+  Carta de intención.
+  Unidad actualmente en otra operación.
+  NO sincroniza INVENTARIO.
+  Al reactivar: valida INVENTARIO = DISPONIBLE.
+end note
+
+note right of VENCIDA
+  Puede reagregarse a la misma operación.
+  INVENTARIO ya está en DISPONIBLE.
+  Nuevo intento con nuevo timer.
+end note
+
+note bottom of CONFIRMADA
+  Estado clave: unidad asegurada para la operación.
+  Puede pasar a RESERVADA si la unidad
+  se necesita en otra operación urgente.
+end note
+@enduml

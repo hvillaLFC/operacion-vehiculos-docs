@@ -1,0 +1,59 @@
+@startuml matriz-transiciones
+title Matriz de Transiciones de Estado - Sistema de Renta de Vehículos
+
+skinparam {
+  BackgroundColor white
+  TableBorderColor black
+  TableCellBorderColor gray
+}
+
+' Representación como tabla de transiciones
+' Filas = estado origen, Columnas = acción, Contenido = estado destino
+
+note as TABLA
+  <b>TABLA: TRANSICIONES DE INVENTARIO</b>
+  
+  | Estado Actual     | Agregar Op. | Confirmar Op. | Checkin   | Checkout  | Job Vence  | Cancelar  | Marcar Venta | Marcar No-Disp. |
+  |-------------------|-------------|---------------|-----------|-----------|------------|-----------|--------------|-----------------|
+  | DISPONIBLE        | EN_PROCESO  | —             | —         | —         | —          | —         | VENDIDO      | NO_DISPONIBLE   |
+  | EN_PROCESO        | —           | APARTADO      | —         | —         | DISPONIBLE | —         | —            | —               |
+  | APARTADO          | —           | —             | RENTADO   | —         | —          | DISPONIBLE| —            | —               |
+  | RENTADO           | —           | —             | —         | DISPONIBLE| —          | DISPONIBLE| —            | —               |
+  | VENDIDO           | —           | —             | —         | —         | —          | —         | —            | —               |
+  | NO_DISPONIBLE     | —           | —             | —         | —         | —          | —         | —            | —               |
+end note
+
+note as TABLA2
+  <b>TABLA: TRANSICIONES DE OPERACION_UNIDADES</b>
+  
+  | Estado Actual | Confirmar  | Vence (Job) | Checkin  | Checkout  | Cancelar  | Crear Reserva | Reactivar  | Re-Agregar |
+  |---------------|------------|-------------|----------|-----------|-----------|---------------|------------|------------|
+  | EN_PROCESO    | CONFIRMADA | VENCIDA     | —        | —         | —         | —             | —          | —          |
+  | VENCIDA       | —          | —           | —        | —         | —         | —             | —          | EN_PROCESO |
+  | CONFIRMADA    | —          | —           | EN_RENTA | —         | CANCELADA | RESERVADA     | —          | —          |
+  | EN_RENTA      | —          | —           | —        | FINALIZADA| CANCELADA | —             | —          | —          |
+  | FINALIZADA    | —          | —           | —        | —         | —         | —             | —          | —          |
+  | CANCELADA     | —          | —           | —        | —         | —         | —             | —          | —          |
+  | RESERVADA     | —          | —           | —        | —         | CANCELADA | —             | CONFIRMADA | —          |
+end note
+
+note as TABLA3
+  <b>TABLA: SINCRONIZACIÓN INV ↔ OPUN POR ACCIÓN</b>
+  
+  | # | Acción          | INV Antes    | OPUN Antes   | INV Después  | OPUN Después | Sync? | Timer  | Validaciones                          |
+  |---|-----------------|--------------|--------------|--------------|--------------|-------|--------|---------------------------------------|
+  | 1 | Agregar         | DISPONIBLE   | (nueva)      | EN_PROCESO   | EN_PROCESO   | ✅    | 15 min | INV.operacion_activa = NULL           |
+  | 2 | Confirmar       | EN_PROCESO   | EN_PROCESO   | APARTADO     | CONFIRMADA   | ✅    | —      | fecha_agregada < now() - 15min        |
+  | 3 | Vencimiento     | EN_PROCESO   | EN_PROCESO   | DISPONIBLE   | VENCIDA      | ✅    | Auto   | Job: fecha_vencimiento < NOW()        |
+  | 4 | Checkin         | APARTADO     | CONFIRMADA   | RENTADO      | EN_RENTA     | ✅    | —      | Documentación completa                |
+  | 5 | Checkout        | RENTADO      | EN_RENTA     | DISPONIBLE   | FINALIZADA   | ✅    | —      | Documentación de devolución           |
+  | 6 | Cancelar        | APARTADO     | CONFIRMADA   | DISPONIBLE   | CANCELADA    | ✅    | —      | Motivo de cancelación                 |
+  | 7 | Cancelar renta  | RENTADO      | EN_RENTA     | DISPONIBLE   | CANCELADA    | ✅    | —      | Autorización supervisor               |
+  | 8 | Reservar        | RENTADO      | (nueva)      | RENTADO      | RESERVADA    | ⚠️ NO | —      | INV en otra operación                 |
+  | 9 | Reactivar       | DISPONIBLE   | RESERVADA    | APARTADO     | CONFIRMADA   | ✅    | —      | Validar INV = DISPONIBLE              |
+  |10 | Re-agregar      | DISPONIBLE   | VENCIDA      | EN_PROCESO   | EN_PROCESO   | ✅    | 15 min | INV debe estar DISPONIBLE             |
+end note
+
+TABLA -[hidden]-> TABLA2
+TABLA2 -[hidden]-> TABLA3
+@enduml

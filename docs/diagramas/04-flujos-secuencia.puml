@@ -1,0 +1,103 @@
+@startuml flujos-secuencia
+title Flujos Secuenciales Críticos - Sistema de Renta de Vehículos
+
+actor Ejecutivo as E
+participant "Sistema\nOperaciones" as SO
+participant "Job\nScheduler" as JS
+participant "Inventario\nService" as IS
+database "Base de\nDatos" as DB
+
+== Flujo 1: Crear Operación y Agregar Unidades ==
+
+E -> SO: Crear cotización (cliente, fechas)
+SO -> DB: INSERT OPERACIONES (estado: COTIZACION)
+SO --> E: CUN-001 creada
+
+E -> SO: Agregar unidad VIN-001 a CUN-001
+SO -> IS: Validar INV[VIN-001].estado = DISPONIBLE
+IS -> DB: SELECT inventario WHERE id = VIN-001
+DB --> IS: estado = DISPONIBLE ✓
+IS --> SO: Validación OK
+
+SO -> DB: INSERT OPERACION_UNIDADES\n(id_opun, CUN-001, VIN-001, estado: EN_PROCESO,\nfecha_agregada: now(), fecha_vencimiento: now()+15min)
+SO -> DB: UPDATE INVENTARIO SET estado = EN_PROCESO\nWHERE id = VIN-001
+SO --> E: Unidad agregada ✓ (15 min para confirmar)
+
+== Flujo 2: Job Scheduler - Vencimiento Automático ==
+
+JS -> DB: SELECT op_unidades\nWHERE estado = 'EN_PROCESO'\nAND fecha_vencimiento < NOW()
+DB --> JS: [VIN-001, VIN-005, VIN-009]
+
+loop Por cada unidad vencida
+  JS -> DB: UPDATE OPERACION_UNIDADES\nSET estado = 'VENCIDA'\nWHERE id_opun = X
+  JS -> IS: Liberar inventario(id_inventario)
+  IS -> DB: UPDATE INVENTARIO SET estado = 'DISPONIBLE'\nWHERE id = X
+  IS --> JS: OK
+end
+
+JS --> SO: 3 unidades vencidas procesadas
+
+== Flujo 3: Confirmar Operación ==
+
+E -> SO: Confirmar operación CUN-001
+SO -> DB: SELECT op_unidades WHERE id_operacion = CUN-001\nAND estado = 'EN_PROCESO'
+DB --> SO: [VIN-001]
+
+SO -> DB: Verificar fecha_vencimiento > NOW()
+DB --> SO: VIN-001 vigente ✓
+
+SO -> DB: UPDATE OPERACION_UNIDADES\nSET estado = 'CONFIRMADA', fecha_confirmada = NOW()
+SO -> IS: Actualizar INV.estado = APARTADO
+IS -> DB: UPDATE INVENTARIO SET estado = 'APARTADO'
+SO -> DB: UPDATE OPERACIONES SET estado = 'CONFIRMADA'
+SO --> E: Operación CUN-001 confirmada ✓
+
+== Flujo 4: Checkin ==
+
+E -> SO: Iniciar checkin CUN-001, VIN-001
+SO -> DB: Validar OPUN.estado = CONFIRMADA\nY INV.estado = APARTADO
+DB --> SO: Ambos estados válidos ✓
+
+SO -> DB: UPDATE OPERACION_UNIDADES\nSET estado = 'EN_RENTA', fecha_checkin = NOW()
+SO -> IS: INV.estado = RENTADO, id_operacion_activa = CUN-001
+IS -> DB: UPDATE INVENTARIO
+SO --> E: Checkin completado ✓ - Vehículo entregado
+
+== Flujo 5: Registrar Unidad Reservada ==
+
+note over E,DB: VIN-001 está RENTADO en CUN-001.\nEjecutivo crea CUN-002 y quiere incluir VIN-001.
+
+E -> SO: Agregar VIN-001 a CUN-002
+SO -> IS: Validar INV[VIN-001].estado
+IS -> DB: SELECT inventario WHERE id = VIN-001
+DB --> IS: estado = RENTADO (en CUN-001)
+IS --> SO: Unidad ocupada - puede crear RESERVADA
+
+SO -> DB: INSERT OPERACION_UNIDADES\n(CUN-002, VIN-001, estado: RESERVADA)
+note right: NO actualiza INVENTARIO
+SO --> E: VIN-001 agregada como RESERVADA en CUN-002
+
+== Flujo 6: Checkout y Reactivación Automática ==
+
+E -> SO: Registrar checkout VIN-001 en CUN-001
+SO -> DB: UPDATE OPERACION_UNIDADES (CUN-001)\nSET estado = 'FINALIZADA', fecha_checkout = NOW()
+SO -> IS: INV.estado = DISPONIBLE, id_operacion_activa = NULL
+IS -> DB: UPDATE INVENTARIO
+
+note over JS,DB: Job detecta que VIN-001 quedó disponible
+JS -> DB: SELECT op_unidades WHERE estado = 'RESERVADA'\nAND id_inventario = VIN-001
+DB --> JS: [CUN-002 tiene VIN-001 RESERVADA]
+JS --> SO: Notificar reactivaciones pendientes
+SO --> E: ⚠️ VIN-001 disponible - CUN-002 tiene intención RESERVADA
+
+E -> SO: Reactivar VIN-001 en CUN-002
+SO -> IS: Validar INV[VIN-001].estado = DISPONIBLE
+IS -> DB: SELECT inventario WHERE id = VIN-001
+DB --> IS: estado = DISPONIBLE ✓
+
+SO -> DB: UPDATE OPERACION_UNIDADES (CUN-002)\nSET estado = 'CONFIRMADA'
+SO -> IS: INV.estado = APARTADO
+IS -> DB: UPDATE INVENTARIO
+SO --> E: VIN-001 reactivada en CUN-002 ✓
+
+@enduml

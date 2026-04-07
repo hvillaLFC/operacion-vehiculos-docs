@@ -1,0 +1,132 @@
+@startuml erd-estructura-datos
+title Diagrama Entidad-Relación - Sistema de Operaciones de Renta de Vehículos
+
+entity INVENTARIO {
+  * id_inventario : BIGINT <<PK>>
+  --
+  * numero_serie : VARCHAR(50) <<UNIQUE>>
+  * placa : VARCHAR(20) <<UNIQUE>>
+  * modelo : VARCHAR(100)
+  * marca : VARCHAR(100)
+  * anio : INT
+  * color : VARCHAR(50)
+  * estado : ENUM('DISPONIBLE','EN_PROCESO','APARTADO',
+                  'RENTADO','VENDIDO','NO_DISPONIBLE')
+  * fecha_estado : DATETIME
+  id_operacion_activa : BIGINT <<FK, NULL>>
+  fecha_creacion : DATETIME
+  fecha_actualizacion : DATETIME
+}
+
+entity OPERACIONES {
+  * id_operacion : BIGINT <<PK>>
+  --
+  * cun : VARCHAR(20) <<UNIQUE>>
+  * id_cliente : BIGINT <<FK>>
+  * id_ejecutivo : BIGINT <<FK>>
+  * estado : ENUM('COTIZACION','CONFIRMADA','EN_RENTA',
+                  'FINALIZADA','CANCELADA')
+  * fecha_inicio_esperada : DATE
+  * fecha_fin_esperada : DATE
+  fecha_confirmacion : DATETIME
+  fecha_creacion : DATETIME
+  fecha_actualizacion : DATETIME
+}
+
+entity OPERACION_UNIDADES {
+  * id_opun : BIGINT <<PK>>
+  --
+  * id_operacion : BIGINT <<FK>>
+  * id_inventario : BIGINT <<FK>>
+  * estado : ENUM('EN_PROCESO','VENCIDA','CONFIRMADA',
+                  'EN_RENTA','FINALIZADA','CANCELADA','RESERVADA')
+  * fecha_agregada : DATETIME
+  fecha_confirmada : DATETIME
+  fecha_checkin : DATETIME
+  fecha_checkout : DATETIME
+  fecha_vencimiento : DATETIME
+  observaciones : TEXT
+  fecha_actualizacion : DATETIME
+}
+
+entity OPERACION_PERIODOS {
+  * id_periodo : BIGINT <<PK>>
+  --
+  * id_operacion : BIGINT <<FK>>
+  * fecha_inicio : DATE
+  * fecha_fin : DATE
+  * estado : ENUM('ACTIVO','COMPLETADO','CANCELADO')
+  fecha_creacion : DATETIME
+}
+
+entity OPERACION_PERIODO_UNIDADES {
+  * id_periodo_unidad : BIGINT <<PK>>
+  --
+  * id_periodo : BIGINT <<FK>>
+  * id_inventario : BIGINT <<FK>>
+  * estado : ENUM('ACTIVO','COMPLETADO','CANCELADO')
+  fecha_checkin : DATETIME
+  fecha_checkout : DATETIME
+  fecha_creacion : DATETIME
+}
+
+entity CLIENTES {
+  * id_cliente : BIGINT <<PK>>
+  --
+  * nombre : VARCHAR(200)
+  * rfc : VARCHAR(20)
+  * correo : VARCHAR(100)
+  * telefono : VARCHAR(20)
+  fecha_creacion : DATETIME
+}
+
+entity USUARIOS {
+  * id_usuario : BIGINT <<PK>>
+  --
+  * nombre : VARCHAR(200)
+  * correo : VARCHAR(100)
+  * rol : ENUM('EJECUTIVO','ADMIN','SUPERVISOR')
+  activo : BOOLEAN
+}
+
+entity HISTORIAL_ESTADOS {
+  * id_historial : BIGINT <<PK>>
+  --
+  * entidad : VARCHAR(50)
+  * id_entidad : BIGINT
+  * estado_anterior : VARCHAR(50)
+  * estado_nuevo : VARCHAR(50)
+  * id_usuario : BIGINT <<FK>>
+  * motivo : VARCHAR(500)
+  * fecha_cambio : DATETIME
+}
+
+INVENTARIO ||--o{ OPERACION_UNIDADES : "participa en"
+OPERACIONES ||--o{ OPERACION_UNIDADES : "contiene"
+OPERACIONES ||--o{ OPERACION_PERIODOS : "tiene"
+OPERACION_PERIODOS ||--o{ OPERACION_PERIODO_UNIDADES : "incluye"
+INVENTARIO ||--o{ OPERACION_PERIODO_UNIDADES : "asignado a"
+CLIENTES ||--o{ OPERACIONES : "contrata"
+USUARIOS ||--o{ OPERACIONES : "gestiona"
+INVENTARIO ||--o{ HISTORIAL_ESTADOS : "registra cambios"
+OPERACION_UNIDADES ||--o{ HISTORIAL_ESTADOS : "registra cambios"
+
+note top of INVENTARIO
+  Estado global del vehículo.
+  Sincronizado con OPERACION_UNIDADES.
+  id_operacion_activa indica qué operación
+  lo tiene actualmente.
+end note
+
+note top of OPERACION_UNIDADES
+  Estado del vehículo dentro de
+  una operación específica.
+  RESERVADA = carta de intención
+  sin sincronizar INVENTARIO.
+end note
+
+note bottom of HISTORIAL_ESTADOS
+  Auditoría completa de todos
+  los cambios de estado del sistema.
+end note
+@enduml
