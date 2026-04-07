@@ -1,0 +1,75 @@
+@startuml sincronizacion-estados
+title Sincronización INVENTARIO ↔ OPERACION_UNIDADES
+
+left to right direction
+
+package "INVENTARIO (Estado Global)" {
+  state INV_DISPONIBLE as "DISPONIBLE" #lightgreen
+  state INV_EN_PROCESO as "EN_PROCESO" #lightyellow
+  state INV_APARTADO as "APARTADO" #orange
+  state INV_RENTADO as "RENTADO" #lightcoral
+  state INV_VENDIDO as "VENDIDO" #gray
+  state INV_NO_DISPONIBLE as "NO_DISPONIBLE" #darkgray
+}
+
+package "OPERACION_UNIDADES (Estado en Operación)" {
+  state OPUN_EN_PROCESO as "EN_PROCESO" #lightyellow
+  state OPUN_VENCIDA as "VENCIDA" #red
+  state OPUN_CONFIRMADA as "CONFIRMADA" #orange
+  state OPUN_EN_RENTA as "EN_RENTA" #lightcoral
+  state OPUN_FINALIZADA as "FINALIZADA" #lightgreen
+  state OPUN_CANCELADA as "CANCELADA" #gray
+  state OPUN_RESERVADA as "RESERVADA" #lightblue
+}
+
+note "🔄 SINCRONIZADOS:\nAmbos cambian juntos" as N_SYNC #lightcyan
+note "⚠️ NO SINCRONIZADO:\nSolo cambia OPUN" as N_NOSYNC #lightyellow
+
+' Transición 1: Agregar a cotización
+INV_DISPONIBLE -[#blue]-> INV_EN_PROCESO : [1] Agregar a cotización\n⏱️ Timer 15 min
+OPUN_EN_PROCESO -[#blue,dashed]-> OPUN_EN_PROCESO : [1] Creado en EN_PROCESO
+
+' Transición 2: Confirmar
+INV_EN_PROCESO -[#green]-> INV_APARTADO : [2] Confirmar < 15 min
+OPUN_EN_PROCESO -[#green,dashed]-> OPUN_CONFIRMADA : [2] → CONFIRMADA
+
+' Transición 3: Vencimiento (Job)
+INV_EN_PROCESO -[#red]-> INV_DISPONIBLE : [3] Job vence > 15 min
+OPUN_EN_PROCESO -[#red,dashed]-> OPUN_VENCIDA : [3] → VENCIDA
+
+' Transición 4: Checkin
+INV_APARTADO -[#orange]-> INV_RENTADO : [4] Checkin
+OPUN_CONFIRMADA -[#orange,dashed]-> OPUN_EN_RENTA : [4] → EN_RENTA
+
+' Transición 5: Checkout
+INV_RENTADO -[#purple]-> INV_DISPONIBLE : [5] Checkout
+OPUN_EN_RENTA -[#purple,dashed]-> OPUN_FINALIZADA : [5] → FINALIZADA
+
+' Transición 6: Cancelar
+INV_APARTADO -[#gray]-> INV_DISPONIBLE : [6] Cancelar
+OPUN_CONFIRMADA -[#gray,dashed]-> OPUN_CANCELADA : [6] → CANCELADA
+
+' Transición 7: RESERVADA (SIN sincronización)
+INV_RENTADO -[#blue,dotted]-> INV_RENTADO : [7] Sin cambio ⚠️
+OPUN_RESERVADA -[#blue]-> OPUN_RESERVADA : [7] Carta de intención\n(nueva operación)
+
+' Transición 8: Reactivar
+INV_DISPONIBLE -[#darkgreen]-> INV_APARTADO : [8] Reactivar
+OPUN_RESERVADA -[#darkgreen,dashed]-> OPUN_CONFIRMADA : [8] → CONFIRMADA
+
+legend right
+  | Color | Descripción |
+  | <#blue> | Agregar a cotización |
+  | <#green> | Confirmar operación |
+  | <#red> | Vencimiento automático (Job) |
+  | <#orange> | Checkin |
+  | <#purple> | Checkout |
+  | <#gray> | Cancelar |
+  | <#blue,dotted> | RESERVADA (sin sync INV) |
+  | <#darkgreen> | Reactivar reservada |
+  ---
+  Línea sólida → INVENTARIO cambia
+  Línea punteada → OPERACION_UNIDADES cambia
+  Ambas deben ocurrir juntas (excepto [7])
+endlegend
+@enduml

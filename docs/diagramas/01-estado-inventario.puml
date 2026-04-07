@@ -3,39 +3,45 @@ title Estado de INVENTARIO - Máquina de Estados
 
 [*] --> DISPONIBLE
 
-DISPONIBLE --> EN_PROCESO: Unidad agregada a cotización\n(15 min timeout)
-DISPONIBLE --> VENDIDO: Marcar como vendida
-DISPONIBLE --> NO_DISPONIBLE: Marcar como no disponible
+DISPONIBLE --> EN_PROCESO : Ejecutivo agrega a cotización\n(OPERACION_UNIDADES → EN_PROCESO)\n[Timer: 15 min]
+DISPONIBLE --> VENDIDO : Marcar como vendida
+DISPONIBLE --> NO_DISPONIBLE : Marcar como no disponible
 
-EN_PROCESO --> APARTADO: Cotización convertida a operación\n(antes de 15 min)
-EN_PROCESO --> DISPONIBLE: Job vence (15 min expirados)
+EN_PROCESO --> APARTADO : Operación confirmada < 15 min\n(OPERACION_UNIDADES → CONFIRMADA)
+EN_PROCESO --> DISPONIBLE : Job vence (> 15 min)\n(OPERACION_UNIDADES → VENCIDA)
 
-APARTADO --> RENTADO: Checkin completado\n(documentación + entrega)
-APARTADO --> DISPONIBLE: Operación cancelada
+APARTADO --> RENTADO : Checkin completado\n(documentación + entrega)\n(OPERACION_UNIDADES → EN_RENTA)
+APARTADO --> DISPONIBLE : Operación cancelada\n(OPERACION_UNIDADES → CANCELADA)
 
-RENTADO --> DISPONIBLE: Checkout completado\n(retorno a empresa)
-RENTADO --> DISPONIBLE: Operación finalizada
+RENTADO --> DISPONIBLE : Checkout completado\n(retorno a empresa)\n(OPERACION_UNIDADES → FINALIZADA)
 
 VENDIDO --> [*]
 NO_DISPONIBLE --> [*]
 
 note right of EN_PROCESO
   Timeout: 15 minutos
-  Si vence, regresa a DISPONIBLE
-  y el Job sincroniza con
-  OPERACION_UNIDADES
+  Si vence → regresa a DISPONIBLE
+  Job sincroniza automáticamente
+  con OPERACION_UNIDADES → VENCIDA
 end note
 
 note right of APARTADO
-  Unidad reservada en operación
-  Esperando documentación
-  Puede estar en múltiples
-  operaciones (RESERVADA en otras)
+  Unidad reservada para operación
+  Esperando documentación (checkin)
+  Puede estar RESERVADA en otras
+  operaciones simultáneamente
 end note
 
 note right of RENTADO
   Unidad entregada al cliente
-  Participando activamente en operación
-  Puede estar RESERVADA en otra operación
+  Participando activamente
+  Puede estar RESERVADA en
+  otra operación futura
+end note
+
+note bottom of DISPONIBLE
+  Estado base del sistema.
+  Solo desde aquí se puede
+  agregar a nuevas operaciones.
 end note
 @enduml
