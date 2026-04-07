@@ -1,0 +1,8 @@
+@startuml
+[*] --> Estado_Inicial
+Estado_Inicial --> Estado_Activo : Abrir Unidad
+Estado_Activo --> Estado_Inactivo : Cerrar Unidad
+Estado_Activo --> Estado_Reservado : Reservar Unidad
+Estado_Reservado --> Estado_Activo : Desreservar Unidad
+Estado_Inactivo --> Estado_Activo : Reactivar Unidad
+@enduml
