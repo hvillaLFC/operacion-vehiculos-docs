@@ -1,0 +1,41 @@
+@startuml estado-inventario
+title Estado de INVENTARIO - Máquina de Estados
+
+[*] --> DISPONIBLE
+
+DISPONIBLE --> EN_PROCESO: Unidad agregada a cotización\n(15 min timeout)
+DISPONIBLE --> VENDIDO: Marcar como vendida
+DISPONIBLE --> NO_DISPONIBLE: Marcar como no disponible
+
+EN_PROCESO --> APARTADO: Cotización convertida a operación\n(antes de 15 min)
+EN_PROCESO --> DISPONIBLE: Job vence (15 min expirados)
+
+APARTADO --> RENTADO: Checkin completado\n(documentación + entrega)
+APARTADO --> DISPONIBLE: Operación cancelada
+
+RENTADO --> DISPONIBLE: Checkout completado\n(retorno a empresa)
+RENTADO --> DISPONIBLE: Operación finalizada
+
+VENDIDO --> [*]
+NO_DISPONIBLE --> [*]
+
+note right of EN_PROCESO
+  Timeout: 15 minutos
+  Si vence, regresa a DISPONIBLE
+  y el Job sincroniza con
+  OPERACION_UNIDADES
+end note
+
+note right of APARTADO
+  Unidad reservada en operación
+  Esperando documentación
+  Puede estar en múltiples
+  operaciones (RESERVADA en otras)
+end note
+
+note right of RENTADO
+  Unidad entregada al cliente
+  Participando activamente en operación
+  Puede estar RESERVADA en otra operación
+end note
+@enduml
